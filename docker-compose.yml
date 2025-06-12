@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  telegram_bot:
+    build: .
+    container_name: reshala_bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+    volumes:
+      - ./.env:/app/.env
+    restart: unless-stopped 
