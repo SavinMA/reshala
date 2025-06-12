@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode, ChatAction
 from reasoning_engine import ReasoningEngine
 from typing import Dict, Any
+import telegramify_markdown as telegramify
 
 # Настройка логирования
 logging.basicConfig(
@@ -27,6 +28,18 @@ if not TELEGRAM_BOT_TOKEN or not MISTRAL_API_KEY:
 
 # Создание движка рассуждений
 reasoning_engine = ReasoningEngine(MISTRAL_API_KEY)
+
+
+async def _send_long_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, text: str, parse_mode: ParseMode.MARKDOWN_V2) -> None:
+    """Splits a message into chunks of 4000 characters and sends them individually."""
+    text = telegramify.markdownify(text, normalize_whitespace=True)
+    for i in range(0, len(text), 4000):
+        chunk = text[i:i + 4000]
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=chunk,
+            parse_mode=parse_mode
+        )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -80,48 +93,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Отправляем индикатор набора текста
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     
-    # Начальное сообщение
-    start_message = await update.message.reply_text("🚀 Начинаю процесс рассуждения...")
-    
     try:
         # Функция для отправки промежуточных обновлений
         async def send_progress(message: str):
-            await context.bot.send_message(
+            await _send_long_message(
+                context=context,
                 chat_id=chat_id,
                 text=message,
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.MARKDOWN_V2
             )
             # Продолжаем показывать индикатор набора
             await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
         
         # Запускаем процесс рассуждения
-        dialogue_history, solution = await reasoning_engine.reason(
+        _, solution = await reasoning_engine.reason(
             user_question,
             progress_callback=send_progress
         )
-        
-        # Отправляем полный диалог агентов
-        dialogue_text = reasoning_engine.format_dialogue_for_telegram(dialogue_history)
-        
-        # Разбиваем на части, если сообщение слишком длинное
-        MAX_MESSAGE_LENGTH = 4000
-        if len(dialogue_text) > MAX_MESSAGE_LENGTH:
-            # Отправляем по частям
-            for i in range(0, len(dialogue_text), MAX_MESSAGE_LENGTH):
-                part = dialogue_text[i:i + MAX_MESSAGE_LENGTH]
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=part,
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                await asyncio.sleep(0.5)  # Небольшая задержка между сообщениями
-        else:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=dialogue_text,
-                parse_mode=ParseMode.MARKDOWN
-            )
-        
+                
         # Отправляем финальное решение
         final_message = f"""
 🎯 *ФИНАЛЬНОЕ РЕШЕНИЕ:*
@@ -131,16 +120,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 *Шаги реализации:*
 """
         for i, step in enumerate(solution.steps, 1):
-            final_message += f"\n{i}. {step}"
+            final_message += f"""
+{i}. {step}"""
         
-        await context.bot.send_message(
+        await _send_long_message(
+            context=context,
             chat_id=chat_id,
             text=final_message,
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN_V2
         )
-        
-        # Удаляем начальное сообщение
-        await start_message.delete()
         
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}")
@@ -149,8 +137,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             chat_id=chat_id,
             text=error_message
         )
-        await start_message.delete()
-
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик ошибок"""
