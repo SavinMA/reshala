@@ -33,6 +33,7 @@ class ReasoningEngine:
             await progress_callback("🔍 Анализирую проблему...")
             
         problem_analysis = self.analyzer.analyze(user_question)
+        await asyncio.sleep(1) # Задержка между запросами к агентам
         
         dialogue_history.append({
             "agent": "Аналитик",
@@ -55,6 +56,7 @@ class ReasoningEngine:
             
             # Шаг 2: Построение гипотезы
             hypothesis = self.hypothesis_agent.build_hypothesis(problem_analysis, previous_attempts)
+            await asyncio.sleep(1) # Задержка между запросами к агентам
             
             dialogue_history.append({
                 "agent": "Генератор гипотез",
@@ -66,6 +68,7 @@ class ReasoningEngine:
             
             # Шаг 3: Построение решения
             solution = self.solution_agent.build_solution(problem_analysis, hypothesis)
+            await asyncio.sleep(1) # Задержка между запросами к агентам
             
             dialogue_history.append({
                 "agent": "Решатель",
@@ -77,10 +80,11 @@ class ReasoningEngine:
             
             # Шаг 4: Валидация решения
             validation = self.validation_agent.validate_solution(problem_analysis, solution)
+            await asyncio.sleep(1) # Задержка между запросами к агентам
             
             dialogue_history.append({
                 "agent": "Валидатор",
-                "message": f"Результат проверки: {'✅ Решение валидно' if validation.is_valid else '❌ Решение требует доработки'}\nОбратная связь: {validation.feedback}"
+                "message": f"Результат проверки (Валидность решения: {validation.confidence*100}%): {'✅ Решение валидно' if validation.is_valid else '❌ Решение требует доработки'}\nОбратная связь: {validation.feedback}"
             })
             
             if validation.is_valid:

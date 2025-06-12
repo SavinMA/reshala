@@ -22,5 +22,6 @@ class Solution(BaseModel):
 class ValidationResult(BaseModel):
     """Результат проверки решения"""
     is_valid: bool
+    confidence: float
     feedback: str
     missing_aspects: Optional[List[str]] = None 
