@@ -150,6 +150,9 @@ class SolutionAgent(BaseAgent):
 class ValidationAgent(BaseAgent):
     """Агент для проверки решений"""
     
+    def __init__(self, api_key: str, model: str = "mistral-large-latest", max_retries: int = 3):
+        super().__init__(api_key, model, max_retries)
+
     def validate_solution(self, problem: ProblemAnalysis, solution: Solution) -> ValidationResult:
         """Проверяет, решает ли предложенное решение проблему"""
         
@@ -164,8 +167,7 @@ class ValidationAgent(BaseAgent):
 
 Отвечай в формате JSON:
 {{
-    "is_valid": true/false, (true при валидности ответа более 97%),
-    "confidence": 0.97, (Результат сходимости решения в процентах)
+    "confidence": 0.55, (Результат сходимости решения в процентах)
     "feedback": "детальная обратная связь",
     "missing_aspects": ["аспект 1", "аспект 2"] или null
 }}"""

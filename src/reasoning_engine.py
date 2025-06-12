@@ -14,6 +14,8 @@ class ReasoningEngine:
         self.solution_agent = SolutionAgent(api_key)
         self.validation_agent = ValidationAgent(api_key)
         self.max_iterations = 5
+        self.validity_threshold = float(os.getenv("VALIDITY_THRESHOLD_PERCENTAGE", "97")) # Default to "97" if not set
+
         
     async def reason(self, user_question: str, progress_callback=None) -> Tuple[List[Dict[str, Any]], Solution]:
         """
@@ -64,7 +66,7 @@ class ReasoningEngine:
             })
             
             if progress_callback:
-                await progress_callback(f"💡 Гипотеза {iteration}: {hypothesis.hypothesis[:100]}...")
+                await progress_callback(f"💡 Гипотеза {iteration}: {hypothesis.hypothesis}...")
             
             # Шаг 3: Построение решения
             solution = self.solution_agent.build_solution(problem_analysis, hypothesis)
@@ -75,19 +77,21 @@ class ReasoningEngine:
                 "message": f"Решение: {solution.solution}\nШаги:\n" + "\n".join([f"{i+1}. {step}" for i, step in enumerate(solution.steps)])
             })
             
-            if progress_callback:
-                await progress_callback(f"🛠 Решение построено с {len(solution.steps)} шагами")
+            #if progress_callback:
+            #    await progress_callback(f"🛠 Решение построено с {len(solution.steps)} шагами")
             
             # Шаг 4: Валидация решения
             validation = self.validation_agent.validate_solution(problem_analysis, solution)
             await asyncio.sleep(1) # Задержка между запросами к агентам
             
+            isValid = validation.confidence >= self.validity_threshold
+
             dialogue_history.append({
                 "agent": "Валидатор",
-                "message": f"Результат проверки (Валидность решения: {validation.confidence*100}%): {'✅ Решение валидно' if validation.is_valid else '❌ Решение требует доработки'}\nОбратная связь: {validation.feedback}"
+                "message": f"Результат проверки (Валидность решения: {validation.confidence*100:.0f}%): {'✅ Решение валидно' if isValid else '❌ Решение требует доработки'}\nОбратная связь: {validation.feedback}"
             })
             
-            if validation.is_valid:
+            if isValid:
                 if progress_callback:
                     await progress_callback(f"✅ Решение принято после {iteration} итераций!")
                 final_solution = solution
